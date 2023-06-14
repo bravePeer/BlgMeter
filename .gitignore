@@ -2,5 +2,5 @@ code/.pio/*
 code/.vscode/*
 .vscode
 code/_savedValues
-.gitignore
 
+code/.vscode/c_cpp_properties.json

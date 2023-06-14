@@ -8,7 +8,7 @@ class ServerConnetion
     const String& url;
 public:
     ServerConnetion(const String& _host, const String& _url) 
-        : url(_url), host(_host) 
+        :host(_host), url(_url)
     { }
 
     inline bool connectToServer()

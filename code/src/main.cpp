@@ -7,11 +7,12 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 #include <ESP8266mDNS.h>
-#include "RTCstruct.h"
+#include "RTCmenager.h"
 #include "sites/configureSite.h"
 #include "EEPROMmenager.h"
 #include "indicatorLed.h"
 #include "serverConnection.h"
+#include "websiteHandles.h"
 //#include <ESP8266_ISR_Timer.h>
 
 #define USING_TIM_DIV1                false           // for shortest and most accurate timer
@@ -28,19 +29,11 @@ ESP8266Timer timer;
 #define VOLTAGE_MEASURE_ENABLE_PIN 12
 
 
-//NetworkData networkData[1]{{"Nie_dla_Ciebie_NET", "1dosto21"}};//,{"Nie_dla_Ciebie_NET", "1dosto21"}
-
-
-//const char fingerprint[] PROGMEM = "CC:92:D5:FD:41:33:CC:C4:9F:7D:A1:5A:04:F1:11:20:04:3D:FB:48";/////?????
-
-// const String host = "script.google.com";    //max 32 bytes
-// const String id = "";
-// const String url = "/macros/s/AKfycbwQh0izWL4VbBlBqqH5sgk0XvSSFVW4L20FP2DMgXtbDddyLE9MoEtJLYtek-SbStHBaA/exec"; // max 128 bytes" + id + "
 
 
 MMA7660 accelerometer;
 ESP8266WebServer server(80);
-MyRTCData myData;
+// MyRTCData myData;
 
 
 /*
@@ -52,6 +45,7 @@ Battery: ~2000mAh (<<<2400mAh)
 18
 20*/
 
+
 enum MODE {
     CONFIGURE = 0b00000000,
     WORKING = 0b00000010,
@@ -59,6 +53,8 @@ enum MODE {
     OFFLINE = 0b00000000,
     ONLINE = 0b00010000
 };
+
+uint8_t mode = CONFIGURE | OFFLINE;
 
 inline bool ConnectToWiFi()
 {
@@ -144,6 +140,7 @@ inline void setServerHandles()
         server.send_P(200,"text/html", configureSite);
     }); 
 
+server.on("/test", test_handler);
 
 //------------Saving Configurations--------------
     server.on("/saveWiFiConfig", HTTP_GET, [](){
@@ -200,26 +197,24 @@ inline void setServerHandles()
         server.send_P(200, "text/html", response.c_str());
     });
 
-    server.on("/startWork", HTTP_GET, [](){
-        myData.mode = MODE::START;
-        server.send_P(200, "text/html", "response");
-    });
-
 //-------------------Start----------------------
     server.on("/startWork", HTTP_GET, [](){
-        myData.mode = MODE::START;
+        mode = MODE::START;
         server.send_P(200, "text/html", "response");
     });
 
 //-------------------Testing----------------------
+    server.on("/cleanRTC", HTTP_GET, [](){
+        RTCmenager::clean();
+    });
     server.on("/testWriteRTC", HTTP_GET, [](){
-        writeRTC(myData);
-        String response = "Wrote:<br>" + rtcDataToHTML(myData);
+        RTCmenager::writeRTC();
+        String response = "Wrote:<br>" + RTCmenager::rtcDataToHTML();
         server.send_P(200, "text/html", response.c_str());
     });
     server.on("/testReadRTC", HTTP_GET, [](){
-        readRTC(myData);
-        String response = "Red:<br>" + rtcDataToHTML(myData);
+        RTCmenager::readRTC();
+        String response = "Red:<br>" + RTCmenager::rtcDataToHTML();
         server.send_P(200, "text/html", response.c_str());
     });
     server.on("/testCalcVoltage", HTTP_GET, [](){
@@ -280,8 +275,6 @@ inline void setServerHandles()
         server.send_P(200, "text/html", response.c_str());
     });
 
-
-
     server.begin();
     Serial.println("Server started");
     Serial.print("IP: ");
@@ -313,10 +306,12 @@ inline void work()
     bool connectedToServer = serverConnetion.connectToServer();
     if(WiFi.status() != WL_CONNECTED || connectedToServer != true)
     {
-        myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA] = accelerationData;
-        myData.counter++;
+        RTCmenager::addAccelerationData(accelerationData);
+        // myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA] = accelerationData;
+        // myData.counter++;
 
-        writeRTC(myData);
+        // writeRTC(myData);
+        RTCmenager::writeRTC();
         serverConnetion.disconnect();
         Serial.println("No WiFi connection or no server connection");
         goToSleep();
@@ -333,24 +328,25 @@ inline void work()
     json["blg"] = blg;
     json["battery"] = voltage;
 
-    //Send old data
-    Serial.println("counter "+String( myData.counter));
+    //Send old data TODO
+    // RTCmenager::rtcDataToHTML()
+    // Serial.println("counter "+String( myData.counter));
 
-    for (int i = 0; i < MAX_ACCELERATION_DATA && myData.counter  > 0; i++)
-    {
-        s="";
-        json["ax"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ax;
-        json["ay"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ay;
-        json["az"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].az;
-        json["blg"] = blg;
-        json["battery"] = voltage;
+    // for (int i = 0; i < MAX_ACCELERATION_DATA && myData.counter  > 0; i++)
+    // {
+    //     s="";
+    //     json["ax"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ax;
+    //     json["ay"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ay;
+    //     json["az"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].az;
+    //     json["blg"] = blg;
+    //     json["battery"] = voltage;
 
-        serializeJson(json, s);
-        serverConnetion.send(s);
-        myData.counter--;
-        Serial.print("Send old data["+String(i)+"]:");
-        Serial.println(s);
-    }
+    //     serializeJson(json, s);
+    //     serverConnetion.send(s);
+    //     myData.counter--;
+    //     Serial.print("Send old data["+String(i)+"]:");
+    //     Serial.println(s);
+    // }
 
     
     
@@ -397,18 +393,13 @@ inline void work()
     //Clean RTC memory
     if(connectedToServer == true)
     {
-        for (int i = 0; i < MAX_ACCELERATION_DATA; i++)
-        {
-            myData.accelerationData[i].ax = 0;
-            myData.accelerationData[i].ay = 0;
-            myData.accelerationData[i].az = 0;
-        }
-        myData.counter = 0;
-        writeRTC(myData);        
+        RTCmenager::clean();
+        RTCmenager::writeRTC();        
     }
     
-    myData.mode = MODE::WORKING;
-    writeRTC(myData);
+    mode = MODE::WORKING;
+    RTCmenager::setMode(mode);
+    RTCmenager::writeRTC();
     //go to sleep
     goToSleep();
 }
@@ -468,13 +459,15 @@ void setup()
     pinMode(VOLTAGE_MEASURE_ENABLE_PIN, OUTPUT);
     digitalWrite(VOLTAGE_MEASURE_ENABLE_PIN, LOW);
 
-    readRTC(myData);
-    if(!(myData.mode == MODE::WORKING))
-        myData.mode = MODE::CONFIGURE;
+    // readRTC(myData);
+    RTCmenager::readRTC();
+    mode = RTCmenager::getMode();
+    if(!(mode == MODE::WORKING))
+        mode = MODE::CONFIGURE;
 
     if (ConnectToWiFi())
     {
-        myData.mode |= MODE::ONLINE;
+        mode |= MODE::ONLINE;
         IndicatorLed::blinkCode(IndicatorLed::connectedToWiFi);
     }
     else
@@ -490,12 +483,12 @@ void setup()
     
 
     Serial.print("Mode: ");
-    Serial.println(myData.mode);
+    Serial.println(mode);
     
 
-    if((myData.mode & 0x03) ==  MODE::CONFIGURE)
+    if((mode & 0x03) ==  MODE::CONFIGURE)
         configure();
-    else if((myData.mode & 0x03) == MODE::WORKING)
+    else if((mode & 0x03) == MODE::WORKING)
         work();
 
     return;
@@ -554,18 +547,20 @@ void loop()
 #ifndef TEST_FUN_ONLY
     server.handleClient(); 
 
-    if(myData.mode == MODE::START)
+    if(mode == MODE::START)
     {
         //init RTC
-        myData.mode = MODE::WORKING;
-        myData.counter = 0;
-        for (int i = 0; i < MAX_ACCELERATION_DATA; i++)
-        {
-            myData.accelerationData[i].ax = 0;
-            myData.accelerationData[i].ay = 0;
-            myData.accelerationData[i].az = 0;
-        }
-        writeRTC(myData);
+        mode = MODE::WORKING;
+        RTCmenager::clean();
+        RTCmenager::setMode(mode);
+        RTCmenager::writeRTC();
+        // myData.counter = 0;
+        // for (int i = 0; i < MAX_ACCELERATION_DATA; i++)
+        // {
+        //     myData.accelerationData[i].ax = 0;
+        //     myData.accelerationData[i].ay = 0;
+        //     myData.accelerationData[i].az = 0;
+        // }
 
         goToSleep();
         //ESP.deepSleep(10e6); // 10s sleep

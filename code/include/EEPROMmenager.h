@@ -17,14 +17,19 @@ struct ServerConfig
 
 class EEPROMMenager
 {
-    enum ADDRESSES {
-    SSID = 0,  //size: 32 
-    PASS = 32, //      64
-    TMP = 96,  
-    HOST = 96, //      64
-    URL = 160, //     320
-    NAME = 480,//      32
-    END = 512 
+    // enum class SIZES : int {
+    //     SSID = 32,
+    //     PASS = 64
+    // };
+
+    enum ADDRESSES : int {
+        SSID = 0,  //size: 32 
+        PASS = 32, //      64
+        TMP = 96,  
+        HOST = 96, //      64
+        URL = 160, //     320
+        NAME = 480,//      32
+        END = 512 
     };
 
 

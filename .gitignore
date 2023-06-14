@@ -1,6 +1,4 @@
-code/.pio/*
-code/.vscode/*
+code/.pio
 .vscode
 code/_savedValues
-
-code/.vscode/c_cpp_properties.json
+code/.vscode

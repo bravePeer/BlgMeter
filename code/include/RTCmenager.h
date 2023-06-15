@@ -109,10 +109,10 @@ public:
         data2save.mode = mode;
     }
 
-    static void setSleepConfig(uint8_t sleepTime, uint8_t numberOfWakeUp)
+    static void setSleepConfig(uint8_t sleepTime)
     {
         data2save.sleepTime = sleepTime;
-        data2save.numberOfWakeUp = numberOfWakeUp;
+        // data2save.numberOfWakeUp = numberOfWakeUp;
     }
 
     static void addAccelerationData(AccelerationData accelerationData)

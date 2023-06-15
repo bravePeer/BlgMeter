@@ -78,7 +78,10 @@ const char configureSite[] PROGMEM = R"=====(
                 sendRequest("saveSleepConfig", "responseSleepConfig")
             }
             function startWork(){
-                sendRequest("startWork", "startWorkResponse")
+                let params = {
+                    sleepTime:"6"
+                }
+                sendRequest("startWork", "startWorkResponse", params)
             }
 
             /*Testing*/

@@ -3,8 +3,17 @@
 
 extern ESP8266WebServer server;
 
-void test_handler()
+namespace webHandle
 {
-    server.args();
+    void index()
+    {
+        Serial.println("Client connected");
+        server.send_P(200,"text/html", configureSite);
+    }
 
+    void test_handle()
+    {
+        server.args();
+        server.send_P(200, "text/html", "yoł");
+    }
 }

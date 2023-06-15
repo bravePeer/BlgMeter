@@ -7,12 +7,14 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 #include <ESP8266mDNS.h>
+#include <string>
+#include <time.h>
 #include "RTCmenager.h"
 #include "sites/configureSite.h"
 #include "EEPROMmenager.h"
 #include "indicatorLed.h"
 #include "serverConnection.h"
-#include "websiteHandles.h"
+// #include "websiteHandles.h"
 //#include <ESP8266_ISR_Timer.h>
 
 #define USING_TIM_DIV1                false           // for shortest and most accurate timer
@@ -55,7 +57,7 @@ enum MODE {
 };
 
 uint8_t mode = CONFIGURE | OFFLINE;
-
+uint8_t sleepTime = 6;
 inline bool ConnectToWiFi()
 {
     NetworkData networkData = EEPROMMenager::readNetworkData();
@@ -64,8 +66,8 @@ inline bool ConnectToWiFi()
         WiFi.begin(networkData.ssid, networkData.pass);
         Serial.print("Try connect to: ");
         Serial.print(networkData.ssid);
-        Serial.print(" with pass: ");
-        Serial.print(networkData.pass);
+        // Serial.print(" with pass: ");
+        // Serial.print(networkData.pass);
         
         for (int i = 0; i < 10; i++)
         {
@@ -126,7 +128,8 @@ inline float calculateVoltage()
 inline void goToSleep()
 {
     Serial.println("Go to sleep");
-    ESP.deepSleep(10e6); //10s
+    ESP.deepSleep(sleepTime * 3600 * 1e6);
+    // ESP.deepSleep(10e6); //10s
     // ESP.deepSleep(1e6 * 3600); //1h
 }
 
@@ -134,13 +137,10 @@ inline void work();
 
 inline void setServerHandles()
 {
-//---------Server handles----------
     server.on("/", HTTP_GET, [](){
         Serial.println("Client connected");
         server.send_P(200,"text/html", configureSite);
-    }); 
-
-server.on("/test", test_handler);
+        });
 
 //------------Saving Configurations--------------
     server.on("/saveWiFiConfig", HTTP_GET, [](){
@@ -163,9 +163,8 @@ server.on("/test", test_handler);
     });
     server.on("/readWiFiConfig", HTTP_GET, [](){
         NetworkData netData = EEPROMMenager::readNetworkData();
-        String response = "ssid = "+netData.ssid+"<br>pass = " + netData.pass;
+        String response = "ssid = "+netData.ssid;
         Serial.println("ssid = "+netData.ssid);
-        Serial.println("pass = "+netData.pass);
 
         server.send_P(200, "text/html", response.c_str());
     });
@@ -199,8 +198,15 @@ server.on("/test", test_handler);
 
 //-------------------Start----------------------
     server.on("/startWork", HTTP_GET, [](){
-        mode = MODE::START;
-        server.send_P(200, "text/html", "response");
+        if(server.args() == 1) //Number of wake up at day
+        {
+            sleepTime = server.arg(0).toInt();
+            mode = MODE::START;
+            Serial.println(sleepTime);
+            server.send_P(200, "text/html", "Starting work");
+            delay(10);
+        }
+            server.send_P(200, "text/html", "Err");
     });
 
 //-------------------Testing----------------------
@@ -337,7 +343,6 @@ RTC acc data (3): 2     4
                   1     4
                   2     2
                   0     3
-
 */
 
     uint32_t counter = RTCmenager::getCounter();
@@ -345,7 +350,7 @@ RTC acc data (3): 2     4
     if (counter / MAX_ACCELERATION_DATA > 0)
         startIndex = ((counter % MAX_ACCELERATION_DATA) + 1) > MAX_ACCELERATION_DATA ? 0 : (counter % MAX_ACCELERATION_DATA) + 1; //counter - MAX_ACCELERATION_DATA;
     
-    for (int i = 0; i < MAX_ACCELERATION_DATA && i < counter; i++)
+    for (uint32_t i = 0; i < MAX_ACCELERATION_DATA && i < counter; i++)
     {
         AccelerationData accelerationData = RTCmenager::getAccelerationData(i + startIndex);
         json["ax"] = accelerationData.ax;//myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ax;
@@ -411,7 +416,7 @@ RTC acc data (3): 2     4
     mode = MODE::WORKING;
     RTCmenager::setMode(mode);
     RTCmenager::writeRTC();
-    //go to sleep
+
     goToSleep();
 }
 
@@ -487,19 +492,18 @@ void setup()
     }
 
     Serial.println(WiFi.localIP());
-
-   
-    //Set mode to configure/working offline
-    
-
-    Serial.print("Mode: ");
-    Serial.println(mode);
-    
+    Serial.printf("Mode: %d ", mode);
 
     if((mode & 0x03) ==  MODE::CONFIGURE)
+    {
         configure();
+        Serial.println("configure");
+    }
     else if((mode & 0x03) == MODE::WORKING)
+    { 
         work();
+        Serial.println("working");
+    }
 
     return;
 
@@ -559,21 +563,65 @@ void loop()
 
     if(mode == MODE::START)
     {
-        //init RTC
+        Serial.println("Starting work");
         mode = MODE::WORKING;
         RTCmenager::clean();
         RTCmenager::setMode(mode);
+        RTCmenager::setSleepConfig(sleepTime);
         RTCmenager::writeRTC();
-        // myData.counter = 0;
-        // for (int i = 0; i < MAX_ACCELERATION_DATA; i++)
-        // {
-        //     myData.accelerationData[i].ax = 0;
-        //     myData.accelerationData[i].ay = 0;
-        //     myData.accelerationData[i].az = 0;
-        // }
 
+        //Send firt measure
+        ServerConfig serverConfig = EEPROMMenager::readServerConfig();
+        ServerConnetion serverConnetion(serverConfig.host, serverConfig.url);
+        if(!serverConnetion.connectToServer())
+        {
+            server.send_P(200, "text/html", "Error while connecting to server!");
+            return;
+        }
+
+        AccelerationData aData = measureAcceleration();
+
+        String s;
+        DynamicJsonDocument json(1024);
+        json["authCode"] = "bx1oPeUNQSjSIm5pwibr18naNvmG2grX";
+        json["device"] = "esp8266";
+        json["ax"] = aData.ax;
+        json["ay"] = aData.ay;
+        json["az"] = aData.az;
+        json["blg"] = calculateBLG(aData);
+        json["battery"] = calculateVoltage();
+
+
+        serializeJson(json, s);
+        String response = serverConnetion.send(s);
+        deserializeJson(json, response);
+        serverConnetion.disconnect();
+
+    //     Serial.print("Date and time:");
+    //     String timeString = static_cast<String>(json["time"]); 
+    //     Serial.println(timeString);
+        
+    //     //"time":"2023-06-15T16:24:18.338Z"
+    // //2023 6 15 : 17 7 3
+    //     tm ttd={.tm_sec = timeString.substring(17,19).toInt(),
+    //         .tm_min = timeString.substring(14,16).toInt(),
+    //         .tm_hour = timeString.substring(11,13).toInt(),
+    //         .tm_mday = timeString.substring(8,10).toInt(),
+    //         .tm_mon = timeString.substring(5,7).toInt(), 
+    //         .tm_year = timeString.substring(0,4).toInt()};
+    //     Serial.printf("%d %d %d : %d %d %d", ttd.tm_year, ttd.tm_mon, ttd.tm_mday, ttd.tm_hour, ttd.tm_min, ttd.tm_sec);
+        // jest 11 -> tm_hour
+        // 6 -> sleepTime
+        //o 6 pomiar
+        //o 12 pomiar
+        // sleepTime
+        // uint8_t sleep = sleepTime;
+        // while (sleep < ttd.tm_hour)
+        // {
+        //     sleep+=sleepTime;
+        // }
+        
         goToSleep();
-        //ESP.deepSleep(10e6); // 10s sleep
     }    
 #endif
 }

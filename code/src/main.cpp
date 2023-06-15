@@ -294,7 +294,7 @@ inline void configure()
 
 inline void work()
 {
-    Serial.println("works");
+    Serial.println("working");
     float voltage = calculateVoltage();
 
     AccelerationData accelerationData = measureAcceleration();
@@ -322,34 +322,47 @@ inline void work()
     DynamicJsonDocument json(1024);
     json["authCode"] = "bx1oPeUNQSjSIm5pwibr18naNvmG2grX";
     json["device"] = "esp8266";
-    json["ax"] = accelerationData.ax;
-    json["ay"] = accelerationData.ay;
-    json["az"] = accelerationData.az;
-    json["blg"] = blg;
-    json["battery"] = voltage;
+    // json["ax"] = accelerationData.ax;
+    // json["ay"] = accelerationData.ay;
+    // json["az"] = accelerationData.az;
+    // json["blg"] = blg;
+    // json["battery"] = voltage;
 
-    //Send old data TODO
-    // RTCmenager::rtcDataToHTML()
+    // Send old data
+    // RTCmenager::rtcDataToHTML();
     // Serial.println("counter "+String( myData.counter));
 
-    // for (int i = 0; i < MAX_ACCELERATION_DATA && myData.counter  > 0; i++)
-    // {
-    //     s="";
-    //     json["ax"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ax;
-    //     json["ay"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ay;
-    //     json["az"] = myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].az;
-    //     json["blg"] = blg;
-    //     json["battery"] = voltage;
+/*
+RTC acc data (3): 2     4
+                  1     4
+                  2     2
+                  0     3
 
-    //     serializeJson(json, s);
-    //     serverConnetion.send(s);
-    //     myData.counter--;
-    //     Serial.print("Send old data["+String(i)+"]:");
-    //     Serial.println(s);
-    // }
+*/
+
+    uint32_t counter = RTCmenager::getCounter();
+    uint32_t startIndex = 0;
+    if (counter / MAX_ACCELERATION_DATA > 0)
+        startIndex = ((counter % MAX_ACCELERATION_DATA) + 1) > MAX_ACCELERATION_DATA ? 0 : (counter % MAX_ACCELERATION_DATA) + 1; //counter - MAX_ACCELERATION_DATA;
+    
+    for (int i = 0; i < MAX_ACCELERATION_DATA && i < counter; i++)
+    {
+        AccelerationData accelerationData = RTCmenager::getAccelerationData(i + startIndex);
+        json["ax"] = accelerationData.ax;//myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ax;
+        json["ay"] = accelerationData.ay;//myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].ay;
+        json["az"] = accelerationData.az;//myData.accelerationData[myData.counter % MAX_ACCELERATION_DATA].az;
+        json["blg"] = blg;
+        json["battery"] = voltage;
+
+        s="";
+        serializeJson(json, s);
+        serverConnetion.send(s); //TODO add check if lost connection
+        Serial.print("Send old data["+String(i)+"]:");
+        Serial.println(s);
+    }
 
     
-    
+    // new data
     json["ax"] = accelerationData.ax;
     json["ay"] = accelerationData.ay;
     json["az"] = accelerationData.az;
@@ -369,8 +382,6 @@ inline void work()
     //     }
     // )=====";
     
-
-
     serializeJson(json, s);
     String response = serverConnetion.send(s);
     deserializeJson(json, response);
@@ -393,7 +404,7 @@ inline void work()
     //Clean RTC memory
     if(connectedToServer == true)
     {
-        RTCmenager::clean();
+        RTCmenager::cleanAccelerationData();
         RTCmenager::writeRTC();        
     }
     
@@ -459,7 +470,6 @@ void setup()
     pinMode(VOLTAGE_MEASURE_ENABLE_PIN, OUTPUT);
     digitalWrite(VOLTAGE_MEASURE_ENABLE_PIN, LOW);
 
-    // readRTC(myData);
     RTCmenager::readRTC();
     mode = RTCmenager::getMode();
     if(!(mode == MODE::WORKING))
@@ -472,7 +482,7 @@ void setup()
     }
     else
     {
-        // myData.mode |= MODE::OFFLINE;
+        // mode |= MODE::OFFLINE;
         IndicatorLed::blinkCode(IndicatorLed::noConnectedToWiFi);
     }
 

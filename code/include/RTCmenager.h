@@ -55,6 +55,16 @@ public:
         // }
     }
 
+    static void cleanAccelerationData()
+    {
+        for (int i = 0; i < MAX_ACCELERATION_DATA; i++)
+        {
+            data2save.accelerationData[i].ax = 0;
+            data2save.accelerationData[i].ay = 0;
+            data2save.accelerationData[i].az = 0;
+        }
+    }
+
     static void serialPrintRTCMode()
     {
         Serial.print("mode: ");
@@ -82,6 +92,16 @@ public:
     static uint8_t getsleepTime()
     {
         return data2save.sleepTime;
+    }
+
+    static uint32_t getCounter()
+    {
+        return data2save.counter;
+    }
+
+    static AccelerationData getAccelerationData(uint8_t index = 0)
+    {
+        return data2save.accelerationData[index];
     }
 
     static void setMode(uint8_t mode)

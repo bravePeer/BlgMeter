@@ -34,16 +34,20 @@ class EEPROMMenager
 
 
     //TODO change from string to const char*  
-    static inline void write(const String data, uint16 begin, uint16_t end)
+    static inline bool write(const String& data, const uint16& begin, const uint16_t& end)
     {
+        if(data.length() > static_cast<unsigned int>(end - begin))
+            return false;
+
         for (uint16 i = 0; i < data.length(); i++)
             EEPROM.put(begin + i, data[i]);
 
         for (uint16 i = begin + data.length(); i < end; i++)
-            EEPROM.write(i, 0);
-        
+            EEPROM.write(i, 0); 
+
+        return true;
     }
-    static const String read(uint16 begin, uint16 end)
+    static const String read(const uint16& begin, const uint16& end)
     {
         String data = "";
         for (uint16 address = begin; address < end; address++)
@@ -66,14 +70,6 @@ public:
         write(networkData.ssid, SSID, PASS);
         write(networkData.pass, PASS, TMP);
 
-        // for (unsigned int i = 0; i < networkData.ssid.length(); i++)
-        //     EEPROM.put(ADDRESSES::SSID + i, networkData.ssid[i]);
-        // for(unsigned int address = ADDRESSES::SSID+networkData.ssid.length(); address < ADDRESSES::PASS; address++)
-        //     EEPROM.put(address, 0);
-        // for (unsigned int i = 0; i < networkData.pass.length(); i++)
-        //     EEPROM.put(ADDRESSES::PASS + i, networkData.pass[i]);    
-        // for(unsigned int address = ADDRESSES::PASS + networkData.pass.length(); address < ADDRESSES::TMP; address++)
-        //     EEPROM.put(address, 0);
 
         EEPROM.commit();
         EEPROM.end();
@@ -86,21 +82,6 @@ public:
 
         networkData.ssid = read(SSID, PASS);
         networkData.pass = read(PASS, TMP);
-
-        // for (unsigned int address = ADDRESSES::SSID; address < ADDRESSES::PASS; address++)
-        // {
-        //     char readedByte = static_cast<char>(EEPROM.read(address));
-        //     if(readedByte == 0)
-        //         break;
-        //     networkData.ssid += readedByte;
-        // }
-        // for (unsigned int address = ADDRESSES::PASS; address < ADDRESSES::TMP; address++)
-        // { 
-        // char readedByte = static_cast<char>(EEPROM.read(address));
-        //     if(readedByte == 0)
-        //         break;
-        //     networkData.pass += readedByte;
-        // }
         
         EEPROM.end();
         return networkData;
@@ -130,10 +111,24 @@ public:
         return serverConfig;
     }
 
-//TODO add save in EEPROM device name
-    static bool writeDeviceName();
+    static void writeDeviceName(const String& name)
+    {
+        EEPROM.begin(EEPROM_SIZE);
+        delay(10);
+        
+        write(name, NAME, END);
+
+        EEPROM.commit();
+        EEPROM.end();
+    }
     static const String readDeviceName()
     {
-        return "ESP8266 - temporary name";
+        EEPROM.begin(EEPROM_SIZE);
+        delay(10);
+
+        String name = read(NAME, END);
+
+        EEPROM.end();
+        return name;
     }
 };

@@ -76,6 +76,19 @@
             function saveSleepConfig(){
                 sendRequest("saveSleepConfig", "responseSleepConfig")
             }
+
+            function saveDeviceName(){
+                let params = {
+                    deviceName:""
+                }
+                deviceName = document.getElementById("DEVICE_NAME");
+                sendRequest("saveDeviceName", "responseDeviceName");
+            }
+            function readDeviceName(){
+                sendRequest("readDeviceName", "responseDeviceName");
+            }
+
+
             function startWork(){
                 let params = {
                     sleepTime:"6"
@@ -134,6 +147,17 @@
         <br>
         <div id="responseServerConfig"></div>
        </div>
+
+        <div  class="smallbox">
+            <p>Set device name</p>
+            <input style="width: 35px; text-align: center;" type="text" value="BLGmeter" id="DEVICE_NAME">
+            <br>
+            <input type="button" value="save" onclick="saveDeviceName()"/>
+            <input type="button" value="read" onclick="readDeviceName()"/>
+            <br>
+            <div id="responseDeviceName"></div>
+
+        </div>
 
         <div  class="smallbox">
             <p>Configure <br> sleep interval</p>

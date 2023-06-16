@@ -45,7 +45,8 @@ Battery: ~2000mAh (<<<2400mAh)
 14:00 12:15
 16
 18
-20*/
+20
+*/
 
 
 enum MODE {
@@ -170,7 +171,7 @@ inline void setServerHandles()
     });
 
     server.on("/saveServerConfig", HTTP_GET, [](){
-        String response = "saved";
+        String response = "not saved";
         if(server.args() == 2)
         {
             if(!(server.argName(0) == "host" && server.argName(1) == "url"))
@@ -196,6 +197,25 @@ inline void setServerHandles()
         server.send_P(200, "text/html", response.c_str());
     });
 
+    server.on("/saveDeviceName", HTTP_GET, [](){
+        String response = "Not saved";
+        if(server.args() == 1)
+        {
+            String deviceName = server.arg(0);
+            Serial.printf("Device name: %s\n", deviceName.c_str());
+            EEPROMMenager::writeDeviceName(deviceName);
+            response = "Saved";
+        }
+
+        server.send_P(200, "text/html", response.c_str());
+    });
+    server.on("/readDeviceName", HTTP_GET, [](){
+        String deviceName = EEPROMMenager::readDeviceName();
+        String response = "Device name: " + deviceName;
+        Serial.printf("Device name: %s\n", deviceName.c_str());
+
+        server.send_P(200, "text/html", response.c_str());
+    });
 //-------------------Start----------------------
     server.on("/startWork", HTTP_GET, [](){
         if(server.args() == 1) //Number of wake up at day
@@ -306,6 +326,8 @@ inline void work()
     AccelerationData accelerationData = measureAcceleration();
     float blg = calculateBLG(accelerationData);
 
+    String deviceName = EEPROMMenager::readDeviceName();
+
     ServerConfig serverConfig = EEPROMMenager::readServerConfig();
     ServerConnetion serverConnetion(serverConfig.host, serverConfig.url);
 
@@ -327,7 +349,7 @@ inline void work()
     String s;
     DynamicJsonDocument json(1024);
     json["authCode"] = "bx1oPeUNQSjSIm5pwibr18naNvmG2grX";
-    json["device"] = "esp8266";
+    json["device"] = deviceName;
     // json["ax"] = accelerationData.ax;
     // json["ay"] = accelerationData.ay;
     // json["az"] = accelerationData.az;
@@ -571,6 +593,8 @@ void loop()
         RTCmenager::writeRTC();
 
         //Send firt measure
+        String deviceName = EEPROMMenager::readDeviceName();
+        
         ServerConfig serverConfig = EEPROMMenager::readServerConfig();
         ServerConnetion serverConnetion(serverConfig.host, serverConfig.url);
         if(!serverConnetion.connectToServer())
@@ -584,7 +608,7 @@ void loop()
         String s;
         DynamicJsonDocument json(1024);
         json["authCode"] = "bx1oPeUNQSjSIm5pwibr18naNvmG2grX";
-        json["device"] = "esp8266";
+        json["device"] = deviceName;
         json["ax"] = aData.ax;
         json["ay"] = aData.ay;
         json["az"] = aData.az;

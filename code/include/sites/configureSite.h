@@ -81,6 +81,7 @@ const char configureSite[] PROGMEM = R"=====(
                 let params = {
                     sleepTime:"6"
                 }
+                params.sleepTime = document.getElementById("SLEEP_INTERVAL")
                 sendRequest("startWork", "startWorkResponse", params)
             }
 
@@ -139,13 +140,13 @@ const char configureSite[] PROGMEM = R"=====(
             <p>Configure <br> sleep interval</p>
             <input style="width: 35px; text-align: center;" type="number" value="6" id="SLEEP_INTERVAL">
             <br>
-            <input type="button" value="save" onclick="saveSleepConfig()"/>
+            <!-- <input type="button" value="save" onclick="saveSleepConfig()"/> -->
             <div id="responseSleepConfig"></div>
-        </div>
-
-        <div  class="smallbox">
-            <input type="button" value="start work" onclick="startWork()">
-            <div id="startWorkResponse"></div>
+            
+            <div  class="smallbox">
+                <input type="button" value="start work" onclick="startWork()">
+                <div id="startWorkResponse"></div>
+            </div>
         </div>
     </div>
 
